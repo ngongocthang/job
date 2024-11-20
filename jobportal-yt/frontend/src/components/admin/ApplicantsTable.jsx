@@ -12,25 +12,80 @@ const shortlistingStatus = ["Accepted", "Rejected"];
 const ApplicantsTable = () => {
     const { applicants } = useSelector(store => store.application);
     const [selectedApplicant, setSelectedApplicant] = useState(null);
+    const [interviewDetails, setInterviewDetails] = useState({
+        date: '',
+        time: '',
+        location: ''
+    });
+    const [isInterviewFormVisible, setIsInterviewFormVisible] = useState(false);
 
+    // Function to handle status change ("Accepted" or "Rejected")
     const statusHandler = async (status, id) => {
         try {
             axios.defaults.withCredentials = true;
-            const res = await axios.post(`${APPLICATION_API_END_POINT}/status/${id}/update`, { status });
-            if (res.data.success) {
-                toast.success(res.data.message);
+
+            if (status === "Accepted") {
+                // Show interview scheduling form
+                setSelectedApplicant(id);  // Store the applicant id
+                setIsInterviewFormVisible(true);  // Show interview form
+            } else {
+                // Update the status directly for "Rejected" or other statuses
+                const res = await axios.post(`${APPLICATION_API_END_POINT}/status/${id}/update`, { status });
+                if (res.data.success) {
+                    toast.success(res.data.message);
+                }
             }
         } catch (error) {
             toast.error(error.response.data.message);
         }
     };
 
+    // View Applicant Details (opens the modal)
     const handleViewDetails = (applicant) => {
         setSelectedApplicant(applicant);
+        setIsInterviewFormVisible(false); // Hide interview form if viewing details
     };
 
+    // Close the Applicant Details modal
     const handleCloseModal = () => {
         setSelectedApplicant(null);
+        setIsInterviewFormVisible(false); // Close both forms (details and interview)
+    };
+
+    // Submit interview details for an accepted applicant
+    const handleInterviewSubmit = async (e) => {
+        e.preventDefault();
+
+        if (!interviewDetails.date || !interviewDetails.time || !interviewDetails.location) {
+            toast.error("Please fill all interview details.");
+            return;
+        }
+
+        try {
+            axios.defaults.withCredentials = true;
+            const res = await axios.post(`${APPLICATION_API_END_POINT}/status/${selectedApplicant}/update`, {
+                status: "Accepted",
+                interviewDate: interviewDetails.date,
+                interviewTime: interviewDetails.time,
+                interviewLocation: interviewDetails.location,
+            });
+
+            if (res.data.success) {
+                toast.success("Interview details saved successfully!");
+                handleCloseModal();  // Close modal after saving
+            }
+        } catch (error) {
+            toast.error(error.response.data.message);
+        }
+    };
+
+    // Handle input changes in the interview scheduling form
+    const handleInterviewInputChange = (e) => {
+        const { name, value } = e.target;
+        setInterviewDetails((prevDetails) => ({
+            ...prevDetails,
+            [name]: value,
+        }));
     };
 
     return (
@@ -54,12 +109,11 @@ const ApplicantsTable = () => {
                             <TableCell>{item?.applicant?.email}</TableCell>
                             <TableCell>{item?.applicant?.phoneNumber}</TableCell>
                             <TableCell>
-                                {item.applicant?.profile?.resume ?
+                                {item.applicant?.profile?.resume ? (
                                     <a className="text-blue-600 hover:underline" href={item?.applicant?.profile?.resume} target="_blank" rel="noopener noreferrer">
                                         {item?.applicant?.profile?.resumeOriginalName}
                                     </a>
-                                    : <span>NA</span>
-                                }
+                                ) : <span>NA</span>}
                             </TableCell>
                             <TableCell>{item?.applicant.createdAt.split("T")[0]}</TableCell>
                             <TableCell className="text-right">
@@ -85,7 +139,6 @@ const ApplicantsTable = () => {
                                             <span>View Details</span>
                                         </div>
                                     </PopoverContent>
-
                                 </Popover>
                             </TableCell>
                         </tr>
@@ -94,7 +147,7 @@ const ApplicantsTable = () => {
             </Table>
 
             {/* Applicant Details Modal */}
-            {selectedApplicant && (
+            {selectedApplicant && !isInterviewFormVisible && (
                 <div className="fixed inset-0 bg-gray-800 bg-opacity-50 z-50 flex justify-center items-center">
                     <div className="bg-white shadow-lg rounded-lg p-6 w-96">
                         <h3 className="text-2xl font-semibold text-gray-800 mb-4">Applicant Details</h3>
@@ -141,16 +194,64 @@ const ApplicantsTable = () => {
                                 </p>
                             </div>
                         </div>
-                        <button
-                            onClick={handleCloseModal}
-                            className="mt-4 text-red-500 hover:underline"
-                        >
-                            Close Details
-                        </button>
+                        <div className="mt-4 flex justify-end space-x-2">
+                            <button type="button" onClick={handleCloseModal} className="text-red-500 hover:underline">
+                                Close
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
 
+            {/* Interview Scheduling Form */}
+            {isInterviewFormVisible && (
+                <div className="fixed inset-0 bg-gray-800 bg-opacity-50 z-50 flex justify-center items-center">
+                    <div className="bg-white shadow-lg rounded-lg p-6 w-96">
+                        <h3 className="text-2xl font-semibold text-gray-800 mb-4">Schedule Interview</h3>
+                        <form onSubmit={handleInterviewSubmit} className="space-y-4">
+                            <div>
+                                <label className="font-medium text-gray-700">Interview Date:</label>
+                                <input
+                                    type="date"
+                                    name="date"
+                                    value={interviewDetails.date}
+                                    onChange={handleInterviewInputChange}
+                                    className="w-full border rounded p-2 mt-1"
+                                />
+                            </div>
+                            <div>
+                                <label className="font-medium text-gray-700">Interview Time:</label>
+                                <input
+                                    type="time"
+                                    name="time"
+                                    value={interviewDetails.time}
+                                    onChange={handleInterviewInputChange}
+                                    className="w-full border rounded p-2 mt-1"
+                                />
+                            </div>
+                            <div>
+                                <label className="font-medium text-gray-700">Interview Location:</label>
+                                <input
+                                    type="text"
+                                    name="location"
+                                    value={interviewDetails.location}
+                                    onChange={handleInterviewInputChange}
+                                    className="w-full border rounded p-2 mt-1"
+                                />
+                            </div>
+
+                            <div className="mt-4 flex justify-end space-x-2">
+                                <button type="button" onClick={handleCloseModal} className="text-red-500 hover:underline">
+                                    Close
+                                </button>
+                                <button type="submit" className="bg-blue-500 text-white rounded px-4 py-2">
+                                    Save Interview
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

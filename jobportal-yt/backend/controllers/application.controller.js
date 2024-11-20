@@ -95,37 +95,61 @@ export const getApplicants = async (req,res) => {
         console.log(error);
     }
 }
-export const updateStatus = async (req,res) => {
+export const updateStatus = async (req, res) => {
     try {
-        const {status} = req.body;
+        const { status, interviewDate, interviewTime, interviewLocation } = req.body;
         const applicationId = req.params.id;
-        if(!status){
+
+        if (!status) {
             return res.status(400).json({
-                message:'status is required',
-                success:false
-            })
-        };
+                message: 'Status is required.',
+                success: false,
+            });
+        }
 
-        // find the application by applicantion id
-        const application = await Application.findOne({_id:applicationId});
-        if(!application){
+        // Find the application by ID
+        const application = await Application.findOne({ _id: applicationId });
+        if (!application) {
             return res.status(404).json({
-                message:"Application not found.",
-                success:false
-            })
-        };
+                message: "Application not found.",
+                success: false,
+            });
+        }
 
-        // update the status
+        // Update the status
         application.status = status.toLowerCase();
+
+        // If the status is "accepted", update the interview details
+        if (status.toLowerCase() === "accepted") {
+            if (!interviewDate || !interviewTime || !interviewLocation) {
+                return res.status(400).json({
+                    message: "Interview details are required for accepted status.",
+                    success: false,
+                });
+            }
+            application.interviewDetails = {
+                date: interviewDate,
+                time: interviewTime,
+                location: interviewLocation,
+            };
+        } else if (status.toLowerCase() === "rejected") {
+            // If the status is "rejected", reset the interview details
+            application.interviewDetails = null;
+        }
+
         await application.save();
 
         return res.status(200).json({
-            message:"Status updated successfully.",
-            success:true
+            message: "Status updated successfully.",
+            success: true,
         });
 
     } catch (error) {
         console.log(error);
+        return res.status(500).json({
+            message: "Server error.",
+            success: false,
+        });
     }
-}
+};
 
